@@ -61,5 +61,13 @@ public class MessageBar {
 	public void setText(String message) {
 		this.text.setText(message);
 	}
+
+	public int getY() {
+		return background.getY();
+	}
+	
+	public int getHeight(){
+		return background.getHeight();
+	}
 	
 }

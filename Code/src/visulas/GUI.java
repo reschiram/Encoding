@@ -3,18 +3,32 @@ package visulas;
 import main.Main;
 
 import java.awt.Button;
+import java.awt.Color;
+import java.awt.Component;
+import java.awt.Dimension;
+import java.awt.Font;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.awt.event.ComponentEvent;
+import java.awt.event.ComponentListener;
 import java.awt.event.WindowEvent;
 import java.awt.event.WindowListener;
+import java.io.File;
+import java.util.HashMap;
 
+import javax.swing.JComboBox;
+import javax.swing.JFileChooser;
 import javax.swing.JFrame;
 import javax.swing.JPasswordField;
 import javax.swing.JScrollPane;
 import javax.swing.JTextArea;
+import javax.swing.JTextField;
 import javax.swing.ScrollPaneConstants;
+import javax.swing.UIManager;
 
 public class GUI {
+	
+	public static Font DEFAULT_FONT = new Font("TimesNewRoman", Font.BOLD, 20);
 	
 	private JFrame window;
 	private JPasswordField passwordInput;
@@ -25,10 +39,17 @@ public class GUI {
 	private Button decode;
 	private Button load;
 	private Button save;
-	private Button decodeData;
-	private Button encodeData;
+	private Button openFileManager;
+	
+	private Button exportFile;
+	private Button importFile;
+	private Button removeFile;
+	private JTextField keyInput;
+	private JComboBox<String> fileSlection;
 	
 	private Main main;
+	
+	private Dimension size = new Dimension(1050, 550);
 	
 	public GUI(Main main){					
 		createVisuals();
@@ -84,24 +105,90 @@ public class GUI {
 				main.addTask("save_text");
 			}
 		});		
-
-		encodeData.addActionListener(new ActionListener() {			
+		
+		openFileManager.addActionListener(new ActionListener() {
+			
 			@Override
 			public void actionPerformed(ActionEvent e) {
-				//tasks the main thread with the save_folder task
-				main.addTask("save_folder");
-			}
-		});
-
-		decodeData.addActionListener(new ActionListener() {			
-			@Override
-			public void actionPerformed(ActionEvent e) {
-				//tasks the main thread with the load_folder task
-				main.addTask("load_folder");
+				//tasks the main thread to load all saved files
+				main.addTask("create file-loader");
+				//shows the fileManager visuals
+				if(size.getHeight()==550.0)showFileMenu();
 			}
 		});
 		
-		//Todo: add folder encoding / decoding functions
+		importFile.addActionListener(new ActionListener() {			
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				//if no key is specified do nothing
+				if(keyInput.getText().length()==0)return;
+				//create FileSelector-Window
+				try {
+					   UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
+				}catch (Exception ea) {System.out.println(ea);} 
+				JFileChooser fc = new JFileChooser();
+				fc.showOpenDialog(window);
+				File f = fc.getSelectedFile();
+				//only if selected file exists and it is a file
+				if(f!=null && f.exists() && f.isFile()){
+					//tasks the main thread with an import of the file
+					main.addTask("import_file", f.getAbsolutePath(), keyInput.getText());
+				}
+			}
+		});
+		
+		exportFile.addActionListener(new ActionListener() {
+			
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				//if a key is selected tasks the main thread with the export of the file
+				if(fileSlection.getSelectedItem()!=null){
+					main.addTask("export_file", (String) fileSlection.getSelectedItem());
+				}
+			}
+		});
+		
+		removeFile.addActionListener(new ActionListener() {			
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				//if a key is selected tasks the main thread with the removal of the file from the dataBank
+				if(fileSlection.getSelectedItem()!=null){
+					main.addTask("remove_file", (String) fileSlection.getSelectedItem());
+				}
+			}
+		});
+
+		//enable resize
+		window.addComponentListener(new ComponentListener() {
+			
+			private HashMap<Component, int[]> componentData = new HashMap<>();
+			
+			public void componentShown(ComponentEvent e) {}
+			public void componentMoved(ComponentEvent e) {}
+			public void componentHidden(ComponentEvent e) {}
+			
+			@Override
+			public void componentResized(ComponentEvent e) {
+				if(componentData.isEmpty()){
+					double w = size.getWidth()/600;
+					double h = size.getHeight()/650;
+					for(Component comp: window.getContentPane().getComponents()){
+						comp.setLocation((int)(comp.getX()*w), (int) (comp.getY()*h));
+						comp.setSize((int)(comp.getWidth()*w), (int) (comp.getHeight()*h));
+						comp.setFont(DEFAULT_FONT);
+						componentData.put(comp, new int[]{comp.getX(), comp.getY(), comp.getWidth(), comp.getHeight()});
+					}
+					return;
+				}
+				double w = e.getComponent().getWidth()/size.getWidth();
+				double h = e.getComponent().getHeight()/size.getHeight();
+				for(Component comp: window.getContentPane().getComponents()){
+					int[] data = componentData.get(comp);
+					comp.setLocation((int)(data[0]*w), (int) (data[1]*h));
+					comp.setSize((int)(data[2]*w), (int) (data[3]*h));
+				}
+			}
+		});
 	}
 	
 	/**
@@ -109,7 +196,7 @@ public class GUI {
 	 * @return String the String inputed in the password field
 	 */
 	public String getPassword(){
-		String p = new String(passwordInput.getPassword());
+		String p = "p"+new String(passwordInput.getPassword());
 		return p;
 	}
 	
@@ -139,7 +226,7 @@ public class GUI {
 	
 
 	/**
-	 * displays the progress of the de- or encodetask
+	 * displays the progress of the de- or encode-task
 	 * @param the progress to be displayed
 	 */
 	public void setProgress(double progress){
@@ -152,7 +239,7 @@ public class GUI {
 	private void createVisuals() {
 		//create window
 		this.window = new JFrame();
-		this.window.setSize(600, 650);
+		this.window.setSize(this.size);
 		this.window.setLayout(null);
 		this.window.setVisible(true);
 		
@@ -196,16 +283,44 @@ public class GUI {
 		this.save = new Button("Save / Export");
 		this.save.setBounds(600-(120+10*2+5), load.getY(), 120, 40);
 		this.window.add(this.save);
-
-		//create the visuals of the decode_folder-button
-		this.decodeData = new Button("Decode Data");
-		this.decodeData.setBounds(load.getX()+load.getWidth()+30, load.getY(), 120, 40);
-		this.window.add(this.decodeData);
 		
-		//create the visuals of the encode_folder-button
-		this.encodeData = new Button("Encode Data");
-		this.encodeData.setBounds(save.getX()-(120+10*2+5), load.getY(), 120, 40);
-		this.window.add(this.encodeData);
+		//creates Visuals for open-File-Manager-Button
+		this.openFileManager = new Button("Open File Manager (with current password)");
+		this.openFileManager.setLocation(load.getWidth()+load.getX()+10, this.load.getY());
+		this.openFileManager.setSize(save.getX()-openFileManager.getX()-10, 40);
+		this.window.add(this.openFileManager);
+		
+		//<--creates FileManager-Visuals-->
+		
+		//creates Visuals for file-import-Button
+		this.importFile = new Button("Import File");
+		this.importFile.setBounds(10, message.getY()+message.getHeight()+20, 250, 40);
+		this.window.add(this.importFile);
+
+		//creates Visuals for file-export-Button
+		this.exportFile = new Button("Export File");
+		this.exportFile.setBounds(600-(120+10*2+5), importFile.getY(), 120, 40);
+		this.window.add(this.exportFile);
+
+		//creates Visuals for file-remove-Button
+		this.removeFile = new Button("Remove File");
+		this.removeFile.setBounds(exportFile.getX()-130, importFile.getY(), 120, 40);
+		this.window.add(this.removeFile);
+
+		//creates Visuals for keyInput
+		this.keyInput = new JTextField();
+		this.keyInput.setOpaque(true);
+		this.keyInput.setBackground(Color.white);
+		this.keyInput.setSize(100, 30);
+		this.keyInput.setLocation(importFile.getX()+(importFile.getWidth()-keyInput.getWidth())/2, importFile.getY()+importFile.getHeight()+10);
+		this.window.add(new InputHint("Enter File Key", keyInput.getX()+5, keyInput.getY(), keyInput.getWidth(), keyInput.getHeight()).getGraphics());
+		this.window.add(keyInput);
+		
+		//creates Visuals for FileSelector
+		this.fileSlection = new JComboBox<>();
+		this.fileSlection.setSize(100, 30);
+		this.fileSlection.setLocation(removeFile.getX()+(250-fileSlection.getWidth())/2, exportFile.getY()+exportFile.getHeight()+10);
+		this.window.add(fileSlection);
 	}
 
 
@@ -225,6 +340,52 @@ public class GUI {
 			public void windowClosed(WindowEvent e) {}
 			public void windowActivated(WindowEvent e) {}
 		});
+	}
+
+	/**
+	 * returns the JComboBox which is used as a fileSlector
+	 * @return the JComboBox which is used as a fileSlector
+	 */
+	public JComboBox<String> getFileSelector() {
+		return fileSlection;
+	}
+
+	/**
+	 * hides the fileMenu and resizes the Window
+	 */
+	public void hideFileMenu() {		
+		//set default_size
+		this.size = new Dimension(1050, 550);
+		
+		//translate size difference to current scale
+		int heigth = (int) ((window.getHeight()/650.0)*100);
+		this.window.setSize(window.getWidth(), window.getHeight()-heigth);
+		
+		//hide FileMenu
+		this.importFile		.setVisible(false);
+		this.exportFile		.setVisible(false);
+		this.keyInput		.setVisible(false);
+		this.fileSlection	.setVisible(false);
+		this.removeFile		.setVisible(false);
+	}
+
+	/**
+	 * shows the fileMenu and resizes the Window
+	 */
+	public void showFileMenu(){		
+		//set default_size
+		this.size = new Dimension(1050, 650);
+
+		//translate size difference to current scale
+		int heigth = (int) ((window.getHeight()/550.0)*100);
+		this.window.setSize(window.getWidth(), window.getHeight()+heigth);
+
+		//shows FileMenu
+		this.importFile		.setVisible(true);
+		this.exportFile		.setVisible(true);
+		this.keyInput		.setVisible(true);
+		this.fileSlection	.setVisible(true);
+		this.removeFile		.setVisible(true);
 	}
 
 }

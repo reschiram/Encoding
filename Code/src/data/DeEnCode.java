@@ -1,254 +1,206 @@
 package data;
 
+import java.io.UnsupportedEncodingException;
 import java.math.BigInteger;
-import java.util.HashMap;
+import java.nio.ByteBuffer;
+import java.util.BitSet;
 
 import visulas.GUI;
 
 public class DeEnCode {
-
-	//ISO_8859_1-Format used char-collection
-	private char[] Alphabet;
-	private HashMap<Character, Integer> AlphanumericCode = new HashMap<>();
 	
-	//Maximum amount of binaries per char of decoded text
-	private int CodeSize;
-	
-	//Maximum amount of random editing
-	private int codeRandom;
+	private static String CHARSET = "ISO_8859_1";
+	private static int CHARAMOUNT = 256;
+	private static BigInteger CHARSETSIZE   = new BigInteger( CHARAMOUNT   +"");
+	private static BigInteger CHARSETMAXINT = new BigInteger((CHARAMOUNT/2)+"");
 	
 	private GUI gui;
 	
-	public DeEnCode(GUI gui){		
+	/**
+	 * new DeEnCode Object
+	 * @param gui the GUI with is currently used by the user
+	 */
+	public DeEnCode(GUI gui){
 		this.gui = gui;
-		
-		//Fill alphabet with ISO_8859_1-Charset from 0 to 256
-		this.Alphabet = new char[2*2*2*2*2*2*2*2];
-		for (int i=0; i<Alphabet.length; i++) {
-			Alphabet[i] = (char)i;
-			this.AlphanumericCode.put(this.Alphabet[i], i);
-		} 
-		
-		//set maximum amount of binaries per char of decoded text
-		this.CodeSize = Integer.toBinaryString(Alphabet.length-1).length();
 	}
 	
 	/**
-	 * encodes the input text with One-Time-Pad logic
-	 * @param text the String that will be encoded
-	 * @param password the String that will be used to generate the code  
-	 * @return String based on Alphabet(ISO_8859_1 0 to 256) from encoded binaries
-	*/
-	public String encode(String text, String password){		
-		//set Maximum amount of random from password
-		setCodeRandom(password);
-		
-		//initialize encoded binary
-		String binary = "";
-		
-		//estimated Progress
-		gui.setProgress(0.01);
-		
-		//load decoded binaries
-		String bin = "";
-		for(int i = 0; i<text.length(); i++){
-			bin+=getBinaryfromAlphabet(text.charAt(i));
-
-			//addProgress
-			gui.setProgress(0.01+(0.3*((double)i/(double)text.length())));
+	 * decodes the inputed String using One-Time-Pad Logic and the inputed password
+	 * @param text the text to be decoded
+	 * @param password the password to be used for decoding
+	 * @return decoded String 
+	 * @throws UnsupportedEncodingException is returned if a Char from the inputed text is not existing in the default Charset
+	 */
+	public String decode(String text, String password) throws UnsupportedEncodingException{
+		try {
+			return new String(decode(text.getBytes(CHARSET), password), CHARSET);
+		} catch (UnsupportedEncodingException e) {
+			System.out.println("Error while reading a char, that is not supported");
+			throw new UnsupportedEncodingException();
 		}
 		
-		//generate encoding code from password
-		String code = getCode(password);
-		while(code.length()<bin.length()){
-			code = new BigInteger("1"+code, 2).multiply(new BigInteger("1"+code, 2)).toString(2);
-		}
-		
-		//estimated progress
-		gui.setProgress(0.4);
-			
-		//encode with One-Time-Pad logic
-		for(int i = 0; i<bin.length();i++){
-			if		(bin.charAt(i) =='0' && code.charAt(i) =='0')binary+= "0";
-			else if	(bin.charAt(i) =='1' && code.charAt(i) =='1')binary+= "0";
-			else if	(bin.charAt(i) =='0' && code.charAt(i) =='1')binary+= "1";
-			else if	(bin.charAt(i) =='1' && code.charAt(i) =='0')binary+= "1";			
-
-			//addProgress
-			gui.setProgress(0.4+(0.5*((double)i/(double)bin.length())));
-		}
-			
-		//addProgress
-		gui.setProgress(0.9);
-		
-		//stores encoded binaries as decimal numbers (must add a "1" so the zero's at the beginning don't get lost)
-		BigInteger l = new BigInteger("1"+binary, 2);		
-		String newNumber = DezToNewNumber(l,0);
-		
-		//end of encoding process
-		gui.setProgress(1.0);
-		//return the newNumber value of the encoded decimal number 
-		return newNumber;
 	}
-
+	
 	/**
-	 * sets the de- or encode random settings
-	 * @param password the String that will be used to generate the amount of random editing  
-	*/
-	public void setCodeRandom(String password) {				
-		//calculates the amount of random editing for this password, which must be less then 10 
-		int count = 1;
-		int max = Math.abs((int) Math.pow(this.Alphabet.length-1, password.length()));
-		for(int i = 0; i<password.length(); i++){
-			count*=(this.Alphabet.length-1)-this.AlphanumericCode.get(password.charAt(i))+1;
-		}
-		double d = (double)count/(double)max;
-		this.codeRandom = (int) (d*10);
-		
-		//calculates the maximum amount of binaries a char can produce by maximum random
-		this.CodeSize=Integer.toBinaryString((int)(codeRandom*this.Alphabet.length+this.Alphabet.length-1)).length();
-	}
-
-	/**
-	 * decode the input text with One-Time-Pad logic
-	 * @param text the String that will be decoded
-	 * @param password the String that will be used to generate the code  
-	 * @return String based on Alphabet(ISO_8859_1 0 to 256) from decoded binaries
-	*/
-	public String decode(String text, String passwort){
-		//set Maximum amount of random from password
-		setCodeRandom(passwort);
-		
-		//initialize decoded binary
-		String binary = "";
-
-		//estimated Progress
-		gui.setProgress(0.01);
-		
-		//store encoded text as binaries (remove first char, which was only needed to store the binary as a  decimal number)
-		String zwischenspeicher = NewNumberToDez(text).toString(2);		
-		String bin = zwischenspeicher.substring(1, zwischenspeicher.length());
-
-		//generate encoding code from password
-		String code = getCode(passwort);
-		while(code.length()<bin.length()){
-			code = new BigInteger("1"+code, 2).multiply(new BigInteger("1"+code, 2)).toString(2);
-		}
-
-		//estimated Progress
+	 * decodes byte[] data using One-Time-Pad Logic and the inputed password
+	 * @param bytes the encoded bytes (double amount of decoded ones)
+	 * @param password the password to be used for decoding
+	 * @return decoded byte[] which is half as long as the encoded array 
+	 */
+	public byte[] decode(byte[] bytes, String password) {
 		gui.setProgress(0.1);
 		
-		//decode using One-Time-Pad-Logic
-		for(int i = 0; i<bin.length();i++){		
-			if		(bin.charAt(i) =='0' && code.charAt(i) =='0')binary += "0";
-			else if	(bin.charAt(i) =='1' && code.charAt(i) =='1')binary += "0";
-			else if	(bin.charAt(i) =='0' && code.charAt(i) =='1')binary += "1";
-			else if	(bin.charAt(i) =='1' && code.charAt(i) =='0')binary += "1";
-			
+		//get BitArray from ByteArray
+		BitSet decode = BitSet.valueOf(bytes);
+		gui.setProgress(0.2);
+		
+		//get BitArray out of the ByteArray representing the code which should be as close as possible to a unique one generated from the password
+		BitSet code = getCloseToUniqueCode(password, decode.length());
+		gui.setProgress(0.3);
+		
+		//Perform decoding operation
+		decode.xor(code);
+		gui.setProgress(0.6);
+		
+		//remove random part
+		byte[] data = deRandomize(decode.toByteArray());
+		gui.setProgress(0.9);
+		return data;
+	}
 
-			//addProgress
-			gui.setProgress(0.1+(0.8*((double)i/(double)bin.length())));
+	/**
+	 * encodes the inputed String using One-Time-Pad Logic and the inputed password
+	 * @param text the text to be encoded
+	 * @param password the password to be used for encoding
+	 * @return encoded String 
+	 * @throws UnsupportedEncodingException is returned if a Char from the inputed text is not existing in the default Charset
+	 */
+	public String encode(String text, String password) throws UnsupportedEncodingException{
+		try {
+			byte[] encooded = encode(text.getBytes(CHARSET), password);
+			return new String(encooded, CHARSET);
+		} catch (UnsupportedEncodingException e) {
+			System.out.println("Error while reading a char, that is not supported");
+			throw new UnsupportedEncodingException();
 		}
-			
-		//initialize decoded String  
-		String decode = "";
-		//get decoded String from decoded binaries by going through each collection of binaries used for a char
-		while(binary.length()>0){
-			String zeichen = binary.substring(0, this.CodeSize);
-			int zeichenCode = Integer.parseInt(zeichen,2);
-			//remove random added
-			while(zeichenCode>this.Alphabet.length-1){
-				zeichenCode-=this.Alphabet.length;
+	}
+
+	/**
+	 * encodes byte[] data using One-Time-Pad Logic and the inputed password
+	 * @param bytes the decoded bytes (double amount of decoded ones)
+	 * @param password the password to be used for encoding
+	 * @return encoded byte[] which is twice as long as the decoded array 
+	 */
+	public byte[] encode(byte[] bytes, String password) {
+		gui.setProgress(0.1);
+		
+		//generate BitArray out of ByteArray (adding randomness)
+		BitSet encode = randomize(bytes);
+		gui.setProgress(0.3);
+
+		//get BitArray out of the ByteArray representing the code which should be as close as possible to a unique one generated from the password
+		BitSet code = getCloseToUniqueCode(password, encode.length());
+		gui.setProgress(0.4);
+
+		//Perform encoding operation
+		encode.xor(code);
+		gui.setProgress(0.8);
+		
+		//Encoded BitArray to encoded ByteArray
+		byte[] data = encode.toByteArray();
+		gui.setProgress(0.9);
+		return data;
+	}
+
+	/**
+	 * adds randomness to the byte array (per byte 256 to 256*127 only a product of 256)
+	 * @param bytes the bytes to be randomized
+	 * @return randomized BitArray with double length then the origin
+	 */
+	private BitSet randomize(byte[] bytes) {
+		ByteBuffer data = ByteBuffer.allocate(bytes.length*2);
+		//for each byte add randomness
+		for(int i = 0; i<bytes.length; i++){
+			//add randomness
+			int d = ((int)bytes[i])+(int)(CHARAMOUNT*((int)(126*Math.random())))+CHARAMOUNT;
+			//add 2 byte arrays (representing the randomized one)
+			byte[] intBytes = new BigInteger(d+"").toByteArray();
+			data.put(intBytes);
+		}
+		//return BitArray out of ByteBuffer
+		data.rewind();
+		return BitSet.valueOf(data);
+	}
+
+	/**
+	 * removes randomness from the ByteArray (two bytes to one that is not randomized)
+	 * @param bytes where to remove randomness (has to be an even amount of bytes)
+	 * @return a non randomized ByteArray representing the origin ByteArray
+	 */
+	private byte[] deRandomize(byte[] bytes) {
+		ByteBuffer data = ByteBuffer.allocate(bytes.length/2);
+		//for each to bytes
+		for(int i = 0; i<bytes.length; i+=2){
+			//get randomized integer
+			BigInteger integer = new BigInteger(new byte[]{bytes[i], bytes[i+1]});
+			BigInteger randomPart = ((integer.divide(CHARSETSIZE)).multiply(CHARSETSIZE));
+			//remove randomized part
+			integer = integer.subtract(randomPart);
+			if 		(integer.subtract(CHARSETMAXINT).compareTo(BigInteger.ZERO)>=0)integer = CHARSETMAXINT.negate().add(integer.subtract(CHARSETMAXINT));
+			else if (integer.add	 (CHARSETMAXINT).compareTo(BigInteger.ZERO)<=0)integer = integer.negate().subtract(CHARSETMAXINT);
+			//add orign byte to ByteBuffer
+			data.put(integer.toByteArray());
+		}
+		//return non-randomized ByteArray
+		data.rewind();
+		return data.array();
+	}
+	
+	/**
+	 * tries to generate a Code from the password with is unique to that password
+	 * @param password the password from which the unique Code is to be generated
+	 * @param length the length the unique Code is supposed to have
+	 * @return the unique code in form of a BitArray
+	 */
+	private BitSet getCloseToUniqueCode(String password, int length){
+		//corrects the length
+		length = (((int)Math.ceil(length/8.0))*8)-8;
+		try {
+			//get Integer representing the password
+			BigInteger integer = new BigInteger(password.getBytes(CHARSET));
+			//increase the integer until its binary value has the code length
+			while(integer.toString(2).length()<length){
+				integer = new BigInteger(integer.toString()+integer.pow(10).toString());
 			}
-			decode+=this.Alphabet[zeichenCode];
-			binary = binary.substring(this.CodeSize,binary.length());
+			//reduce the number so the code length is exact the supposed one
+			integer = new BigInteger(integer.toString(2).substring(0, length), 2);
+			//return BiteArray representing the integer
+			BitSet set = BitSet.valueOf(integer.toByteArray());
+			return set;
+		} catch (UnsupportedEncodingException e) {
+			System.out.println("Error while reading a byte, that is not supported");			
 		}
-
-		//end of decoding process
-		gui.setProgress(1.0);
-		
-		//return decoded String
-		return decode;
+		return new BitSet();
+	}
+	
+	/**
+	 * calculates the String which is represented by the ByteArray using the default Charset 
+	 * @param data the data to be represented as a String
+	 * @return String representing the data using the default Charset
+	 * @throws UnsupportedEncodingException is thrown if the ByteArray can not be represented using the default Charset
+	 */
+	public static String BYTESTOSTRING(byte[] data) throws UnsupportedEncodingException{
+		return new String(data, CHARSET);
 	}
 
 	/**
-	 * translates a 256 based number to a 10 based number
-	 * @param newNumber the 256 based number to be translated 
-	 * @return BigInteger the translated 256 based number to 10 based number
-	*/
-	private BigInteger NewNumberToDez(String newNumber) {
-		BigInteger size = new BigInteger(this.Alphabet.length+"");
-		BigInteger l = new BigInteger("0");
-		for(int i = 0; i<newNumber.length(); i++){
-			l = l.multiply(size).add(new BigInteger(this.AlphanumericCode.get(newNumber.charAt(i))+""));
-		}
-		return l;
+	 * calculates the ByteArray which is represented by the String using the default Charset 
+	 * @param text the String to be represented as a ByteArray
+	 * @return ByteArray representing the String using the default Charset
+	 * @throws UnsupportedEncodingException is thrown if the String can not be represented using the default Charset
+	 */
+	public static byte[] STRINGTOBYTES(String text) throws UnsupportedEncodingException {
+		return text.getBytes(CHARSET);
 	}
 
-	/**
-	 * translates a char to binaries representing the number in the ISO_8859_1-Table
-	 * @param c the char to be translated 
-	 * @return String of binaries
-	*/
-	private String getBinaryfromAlphabet(char c) {
-		//code based on 256 ACII-Table
-		int code = this.AlphanumericCode.get(c);
-		
-		//add random
-		if(codeRandom>0)code+=((int)(Math.random()*codeRandom))*Alphabet.length;
-		
-		//get binaries from code with the maximum amount of binaries per char under current settings 
-		String binary = Integer.toBinaryString(code);
-		while(binary.length()<this.CodeSize)binary="0"+binary;
-		return binary;
-	}
-
-	/**
-	 * calculates a unique binary from password
- 	 * @param password the password to be used
-	 * @return String of binaries
-	*/
-	private String getCode(String password) {
-		long l = 0;
-		for(int i = 0; i<password.length();i++){
-			Long d = this.AlphanumericCode.get(password.charAt(i))*(long)this.AlphanumericCode.get(password.charAt(password.length()-(i+1)));
-			l = (long)Math.sqrt(l*l+d*d);
-		}
-		return Long.toBinaryString(l);
-	}
-
-	/**
-	 * translates a 10 based number to a 256 based number
-	 * @param bi the 10 based number to be translated 
-	 * @param minLnegth the minimum amount of chars used to represent the 256 based number 
-	 * @return BigInteger the translated 210 based number to a 256 based number
-	*/
-	private String DezToNewNumber(BigInteger bi, int minLength) {
-		String newNumber = "";
-		while(bi.doubleValue()>0){
-			BigInteger[] dr = bi.divideAndRemainder(new BigInteger(this.Alphabet.length + ""));
-			bi = dr[0];
-			newNumber=this.Alphabet[dr[1].intValue()]+newNumber;
-		}
-		while(newNumber.length()<minLength)newNumber=this.Alphabet[0]+newNumber;
-		return newNumber;
-	}
-
-	/**
-	 * translates from decimal number to char using ISO_8859_1 table
-	 * @param i the decimal number of used as ISO_8859_1 table index 
-	 * @return char at the input position in used ISO_8859_1 table
-	*/
-	public char getChar(int i){
-		return this.Alphabet[i];
-	}
-
-	/**
-	 * translates from char to a decimal using ISO_8859_1 table
-	 * @param c the char of the ISO_8859_1 table
-	 * @return int the position of input char in ISO_8859_1 table
-	*/
-	public int getInteger(char c){
-		return this.AlphanumericCode.get(c);
-	}
 }
