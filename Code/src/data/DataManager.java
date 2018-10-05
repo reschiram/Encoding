@@ -12,7 +12,7 @@ public class DataManager {
 	
 	public DataManager(){		
 		//load file where text can be saved
-		this.text_data = new DataFile("./data/Text_Data.data").getFile();
+		this.text_data = new WorkFile("./data/Text_Data.data").getFile();
 	}
 
 	/**

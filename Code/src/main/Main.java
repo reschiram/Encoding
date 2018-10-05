@@ -4,6 +4,7 @@ import java.io.UnsupportedEncodingException;
 import java.util.Timer;
 import java.util.TimerTask;
 
+import data.DataFile;
 import data.DataManager;
 import data.DeEnCode;
 import data.FileManager;
@@ -38,6 +39,7 @@ public class Main {
 				if(!tasks.isEmpty()){
 					String task = tasks.get()[0][0];
 					String[] args = tasks.get()[1];
+					printTask(task, args);
 					tasks.remove();
 					
 					if(task.equals("decode")){
@@ -105,10 +107,26 @@ public class Main {
 							//removes the file using the key which is specified by args[0]
 							fileManager.removeFile(args[0]);
 							gui.setMessage("File removed");
+						}else if(task.equals("change_file_path")){
+							//changes the path of a file
+							try{
+								fileManager.changeFilePath(args[0], args[1]);
+								gui.setMessage("Filepath changed");
+							}catch (Exception e) {
+								gui.setMessage("File \""+args[0]+"\" path could not be changed to: "+args[1]);
+							}
 						}
 					}
 				}
 				gui.setProgress(0.0);
+			}
+
+			private void printTask(String task, String[] args) {
+				String out = task + " {";
+				for(int i = 0; i<args.length; i++)out+="["+args[i]+"], ";
+				if(args.length>0)out = out.substring(0, out.length()-", ".length());
+				out+="}";
+				System.out.println(out);
 			}
 			
 		}, 10, 10);
@@ -121,5 +139,10 @@ public class Main {
 	 */
 	public void addTask(String task, String... args) {
 		tasks.add(new String[][]{new String[]{task}, args});
+	}
+
+	public DataFile getFile(String fileKey) {
+		if(this.fileManager==null)return null;
+		return this.fileManager.getFile(fileKey);
 	}
 }

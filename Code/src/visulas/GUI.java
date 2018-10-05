@@ -26,6 +26,8 @@ import javax.swing.JTextField;
 import javax.swing.ScrollPaneConstants;
 import javax.swing.UIManager;
 
+import data.DataFile;
+
 public class GUI {
 	
 	public static Font DEFAULT_FONT = new Font("TimesNewRoman", Font.BOLD, 20);
@@ -44,7 +46,10 @@ public class GUI {
 	private Button exportFile;
 	private Button importFile;
 	private Button removeFile;
+	private Button changePath;
+	private Button browsePath;
 	private JTextField keyInput;
+	private JTextField path;
 	private JComboBox<String> fileSlection;
 	
 	private Main main;
@@ -59,6 +64,7 @@ public class GUI {
 		createFunctions();
 		
 		setKillAble();
+		update();
 	}
 
 	/**
@@ -111,7 +117,7 @@ public class GUI {
 			@Override
 			public void actionPerformed(ActionEvent e) {
 				//tasks the main thread to load all saved files
-				main.addTask("create file-loader");
+				main.addTask("create_file-loader");
 				//shows the fileManager visuals
 				if(size.getHeight()==550.0)showFileMenu();
 			}
@@ -153,6 +159,8 @@ public class GUI {
 			public void actionPerformed(ActionEvent e) {
 				//if a key is selected tasks the main thread with the removal of the file from the dataBank
 				if(fileSlection.getSelectedItem()!=null){
+					path.setText("");
+					if(fileSlection.getItemCount()==1)path.setEnabled(false);
 					main.addTask("remove_file", (String) fileSlection.getSelectedItem());
 				}
 			}
@@ -187,6 +195,58 @@ public class GUI {
 					comp.setLocation((int)(data[0]*w), (int) (data[1]*h));
 					comp.setSize((int)(data[2]*w), (int) (data[3]*h));
 				}
+			}
+		});
+		
+		fileSlection.addActionListener(new ActionListener() {
+			
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				DataFile file = main.getFile((String) fileSlection.getSelectedItem());
+				if(file==null) return;
+				path.setText(file.getPath());
+				path.setEnabled(true);
+			}
+		});
+		
+		browsePath.addActionListener(new ActionListener() {
+			
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				//if no file is selected, do nothing
+				if(fileSlection.getSelectedItem()==null)return;
+				
+				DataFile file = main.getFile((String) fileSlection.getSelectedItem());
+				
+				//create FileSelector-Window
+				try {
+					UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
+				}catch (Exception ea) {System.out.println(ea);} 
+				JFileChooser fc = new JFileChooser(file.getPath());
+				fc.setFileSelectionMode(JFileChooser.FILES_AND_DIRECTORIES);
+				fc.showOpenDialog(window);
+				
+				File f = fc.getSelectedFile();
+				//only if selected file or folder exists
+				if(f!=null){
+					String p = f.getAbsolutePath();
+					if(f.isFile()){
+						p = f.getParent();
+					}
+					path.setText(p+"\\"+file.getName());
+				}
+			}
+		});
+		
+		changePath.addActionListener(new ActionListener() {
+			
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				//if no file is selected, do nothing
+				if(fileSlection.getSelectedItem()==null)return;
+				
+				//task main with change of filePath
+				main.addTask("change_file_path", (String) fileSlection.getSelectedItem(), path.getText());
 			}
 		});
 	}
@@ -294,33 +354,55 @@ public class GUI {
 		
 		//creates Visuals for file-import-Button
 		this.importFile = new Button("Import File");
-		this.importFile.setBounds(10, message.getY()+message.getHeight()+20, 250, 40);
+		this.importFile.setBounds(10, message.getY()+message.getHeight()+20, 150, 40);
 		this.window.add(this.importFile);
 
 		//creates Visuals for file-export-Button
 		this.exportFile = new Button("Export File");
-		this.exportFile.setBounds(600-(120+10*2+5), importFile.getY(), 120, 40);
+		this.exportFile.setBounds(importFile.getWidth()+importFile.getX()+30, importFile.getY(), 120, 40);
 		this.window.add(this.exportFile);
 
 		//creates Visuals for file-remove-Button
 		this.removeFile = new Button("Remove File");
-		this.removeFile.setBounds(exportFile.getX()-130, importFile.getY(), 120, 40);
+		this.removeFile.setBounds(exportFile.getX()+exportFile.getWidth()+10, importFile.getY(), 120, 40);
 		this.window.add(this.removeFile);
-
+		
+		this.changePath = new Button("Change Path");
+		this.changePath.setFont(DEFAULT_FONT);
+		this.changePath.setBounds(removeFile.getX()+removeFile.getWidth()+10, importFile.getY(), 120, 40);
+		this.window.add(changePath);
+		
 		//creates Visuals for keyInput
 		this.keyInput = new JTextField();
 		this.keyInput.setOpaque(true);
 		this.keyInput.setBackground(Color.white);
-		this.keyInput.setSize(100, 30);
+		this.keyInput.setSize(100, 40);
+		this.keyInput.setFont(DEFAULT_FONT);
 		this.keyInput.setLocation(importFile.getX()+(importFile.getWidth()-keyInput.getWidth())/2, importFile.getY()+importFile.getHeight()+10);
 		this.window.add(new InputHint("Enter File Key", keyInput.getX()+5, keyInput.getY(), keyInput.getWidth(), keyInput.getHeight()).getGraphics());
 		this.window.add(keyInput);
 		
 		//creates Visuals for FileSelector
 		this.fileSlection = new JComboBox<>();
-		this.fileSlection.setSize(100, 30);
-		this.fileSlection.setLocation(removeFile.getX()+(250-fileSlection.getWidth())/2, exportFile.getY()+exportFile.getHeight()+10);
+		this.fileSlection.setSize(100, 40);
+		this.fileSlection.setFont(DEFAULT_FONT);
+		this.fileSlection.setLocation(exportFile.getX(), exportFile.getY()+exportFile.getHeight()+10);
 		this.window.add(fileSlection);
+		
+		this.path = new JTextField();
+		this.path.setEnabled(false);
+		this.path.setOpaque(true);
+		this.path.setBackground(Color.white);
+		this.path.setFont(DEFAULT_FONT);
+		this.path.setSize(200, 40);
+		this.path.setLocation(fileSlection.getX()+fileSlection.getWidth()+10, fileSlection.getY());
+		this.path.setForeground(Color.black);
+		this.window.add(path);
+		
+		this.browsePath = new Button("Browse");
+		this.browsePath.setFont(DEFAULT_FONT);
+		this.browsePath.setBounds(path.getX()+path.getWidth()+10, fileSlection.getY(), 60, 40);
+		this.window.add(browsePath);
 	}
 
 
@@ -367,6 +449,9 @@ public class GUI {
 		this.keyInput		.setVisible(false);
 		this.fileSlection	.setVisible(false);
 		this.removeFile		.setVisible(false);
+		this.path			.setVisible(false);
+		this.changePath		.setVisible(false);
+		this.browsePath		.setVisible(false);
 	}
 
 	/**
@@ -386,6 +471,9 @@ public class GUI {
 		this.keyInput		.setVisible(true);
 		this.fileSlection	.setVisible(true);
 		this.removeFile		.setVisible(true);
+		this.path			.setVisible(true);
+		this.changePath		.setVisible(true);
+		this.browsePath		.setVisible(true);
 	}
 
 }

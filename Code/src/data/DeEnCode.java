@@ -3,6 +3,7 @@ package data;
 import java.io.UnsupportedEncodingException;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
+import java.util.Arrays;
 import java.util.BitSet;
 
 import visulas.GUI;
@@ -48,7 +49,9 @@ public class DeEnCode {
 	 * @return decoded byte[] which is half as long as the encoded array 
 	 */
 	public byte[] decode(byte[] bytes, String password) {
-		gui.setProgress(0.1);
+		
+		bytes = Arrays.copyOf(bytes, bytes.length-1);
+		gui.setProgress(0.1);		
 		
 		//get BitArray from ByteArray
 		BitSet decode = BitSet.valueOf(bytes);
@@ -59,7 +62,7 @@ public class DeEnCode {
 		gui.setProgress(0.3);
 		
 		//Perform decoding operation
-		decode.xor(code);
+		code.xor(decode);
 		gui.setProgress(0.6);
 		
 		//remove random part
@@ -103,7 +106,7 @@ public class DeEnCode {
 		gui.setProgress(0.4);
 
 		//Perform encoding operation
-		encode.xor(code);
+		code.xor(encode);
 		gui.setProgress(0.8);
 		
 		//Encoded BitArray to encoded ByteArray
@@ -118,7 +121,7 @@ public class DeEnCode {
 	 * @return randomized BitArray with double length then the origin
 	 */
 	private BitSet randomize(byte[] bytes) {
-		ByteBuffer data = ByteBuffer.allocate(bytes.length*2);
+		ByteBuffer data = ByteBuffer.allocate(bytes.length*2+1);
 		//for each byte add randomness
 		for(int i = 0; i<bytes.length; i++){
 			//add randomness
@@ -127,6 +130,7 @@ public class DeEnCode {
 			byte[] intBytes = new BigInteger(d+"").toByteArray();
 			data.put(intBytes);
 		}
+		data.put((byte)255);
 		//return BitArray out of ByteBuffer
 		data.rewind();
 		return BitSet.valueOf(data);
@@ -138,11 +142,13 @@ public class DeEnCode {
 	 * @return a non randomized ByteArray representing the origin ByteArray
 	 */
 	private byte[] deRandomize(byte[] bytes) {
-		ByteBuffer data = ByteBuffer.allocate(bytes.length/2);
+		ByteBuffer data = ByteBuffer.allocate((int) Math.ceil(bytes.length/2.0));
 		//for each to bytes
-		for(int i = 0; i<bytes.length; i+=2){
+		for(int i = 0; i<Math.ceil(bytes.length/2.0)*2; i+=2){
 			//get randomized integer
-			BigInteger integer = new BigInteger(new byte[]{bytes[i], bytes[i+1]});
+			BigInteger integer;
+			if(i+1<bytes.length) integer = new BigInteger(new byte[]{bytes[i], bytes[i+1]});
+			else integer = new BigInteger(new byte[]{bytes[i], (byte)0});
 			BigInteger randomPart = ((integer.divide(CHARSETSIZE)).multiply(CHARSETSIZE));
 			//remove randomized part
 			integer = integer.subtract(randomPart);
@@ -163,17 +169,13 @@ public class DeEnCode {
 	 * @return the unique code in form of a BitArray
 	 */
 	private BitSet getCloseToUniqueCode(String password, int length){
-		//corrects the length
-		length = (((int)Math.ceil(length/8.0))*8)-8;
 		try {
 			//get Integer representing the password
 			BigInteger integer = new BigInteger(password.getBytes(CHARSET));
 			//increase the integer until its binary value has the code length
-			while(integer.toString(2).length()<length){
-				integer = new BigInteger(integer.toString()+integer.pow(10).toString());
+			while(integer.toByteArray().length<length/8){
+				integer = integer.pow(5);
 			}
-			//reduce the number so the code length is exact the supposed one
-			integer = new BigInteger(integer.toString(2).substring(0, length), 2);
 			//return BiteArray representing the integer
 			BitSet set = BitSet.valueOf(integer.toByteArray());
 			return set;
